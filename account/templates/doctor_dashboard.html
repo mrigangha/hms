@@ -1,0 +1,147 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Doctor Dashboard{% endblock %}
+{% block user_role %}Physician{% endblock %}
+
+{% block nav_links %}
+<div class="nav-section">
+  <span class="nav-section-label">Main</span>
+  <a href="{% url 'doctor_dashboard' %}" class="nav-item active">
+    <span class="ni">⊞</span> Dashboard
+  </a>
+  <a href="{% url 'add_availability' %}" class="nav-item">
+    <span class="ni">◷</span> My Availability
+  </a>
+  <a href="{% url 'doctor_appointments' %}" class="nav-item">
+    <span class="ni">📋</span> Appointments
+  </a>
+</div>
+<div class="nav-section">
+  <span class="nav-section-label">Account</span>
+  <a href="{% url 'profile' %}" class="nav-item">
+    <span class="ni">👤</span> Profile
+  </a>
+  <a href="{% url 'logout' %}" class="nav-item">
+    <span class="ni">→</span> Sign Out
+  </a>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+
+<!-- Topbar -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Good day, Dr. {{ user.first_name }} 👋</div>
+    <div class="topbar-sub">{% now "l, F j, Y" %} — Here's your schedule at a glance.</div>
+  </div>
+  <a href="{% url 'add_availability' %}" class="dash-btn">+ Add Slot</a>
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat s-teal">
+    <div class="stat-label">Total</div>
+    <div class="stat-value">{{ stats.total }}</div>
+    <div class="stat-sub">All appointments</div>
+  </div>
+  <div class="stat s-yellow">
+    <div class="stat-label">Pending</div>
+    <div class="stat-value">{{ stats.pending }}</div>
+    <div class="stat-sub">Awaiting action</div>
+  </div>
+  <div class="stat s-blue">
+    <div class="stat-label">Confirmed</div>
+    <div class="stat-value">{{ stats.confirmed }}</div>
+    <div class="stat-sub">Upcoming visits</div>
+  </div>
+  <div class="stat s-teal">
+    <div class="stat-label">Completed</div>
+    <div class="stat-value">{{ stats.completed }}</div>
+    <div class="stat-sub">Visits done</div>
+  </div>
+</div>
+
+<!-- Today's schedule -->
+{% if todays_appointments %}
+<div class="today-band">
+  <div class="today-dot"></div>
+  <div style="flex:1">
+    <div class="today-label">Today's Schedule</div>
+    {% for appt in todays_appointments %}
+    <div class="today-row">
+      <span class="today-time">{{ appt.start_time|time:"g:i A" }}</span>
+      <span class="today-name">
+        {{ appt.patient.get_full_name }}
+        {% if appt.reason %} — {{ appt.reason|truncatechars:40 }}{% endif %}
+      </span>
+      <span class="badge badge-{{ appt.status }}" style="margin-left:auto">{{ appt.status }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- Content grid -->
+<div class="content-grid">
+
+  <!-- Upcoming table -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Upcoming Appointments</span>
+      <a href="{% url 'doctor_appointments' %}" class="panel-link">View all →</a>
+    </div>
+    {% if upcoming_appointments %}
+      <div class="tbl-head tbl-4">
+        <span>Patient</span><span>Date</span><span>Time</span><span>Status</span>
+      </div>
+      {% for appt in upcoming_appointments %}
+      <div class="tbl-row tbl-4">
+        <div>
+          <div class="row-name">{{ appt.patient.get_full_name }}</div>
+          <div class="row-sub">{{ appt.reason|default:"General Consultation"|truncatechars:38 }}</div>
+        </div>
+        <div class="row-date">{{ appt.appointment_date|date:"M j, Y" }}</div>
+        <div class="row-time">{{ appt.start_time|time:"g:i A" }}</div>
+        <span class="badge badge-{{ appt.status }}">{{ appt.status }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        <div class="empty-icon">📅</div>
+        No upcoming appointments.
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Summary side panel -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">Summary</span>
+    </div>
+    <div style="padding:1.2rem 1.4rem; display:flex; flex-direction:column; gap:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:1px solid var(--border);">
+        <span style="font-size:0.82rem; color:var(--muted);">Pending review</span>
+        <span class="badge badge-pending">{{ stats.pending }}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:1px solid var(--border);">
+        <span style="font-size:0.82rem; color:var(--muted);">Confirmed</span>
+        <span class="badge badge-confirmed">{{ stats.confirmed }}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-bottom:12px; border-bottom:1px solid var(--border);">
+        <span style="font-size:0.82rem; color:var(--muted);">Completed</span>
+        <span class="badge badge-completed">{{ stats.completed }}</span>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center;">
+        <span style="font-size:0.82rem; color:var(--muted);">Cancelled</span>
+        <span class="badge badge-cancelled">{{ stats.cancelled }}</span>
+      </div>
+      <a href="{% url 'add_availability' %}" class="dash-btn" style="margin-top:0.4rem; justify-content:center;">
+        + Add Availability
+      </a>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

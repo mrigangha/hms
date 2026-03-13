@@ -1,0 +1,439 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}My Appointments{% endblock %}
+{% block user_role %}Patient{% endblock %}
+
+{% block nav_links %}
+<div class="nav-section">
+  <span class="nav-section-label">Main</span>
+  <a href="{% url 'patient_dashboard' %}" class="nav-item">
+    <span class="ni">⊞</span> Dashboard
+  </a>
+  <a href="{% url 'book_appointment' %}" class="nav-item">
+    <span class="ni">＋</span> Book Appointment
+  </a>
+  <a href="{% url 'patient_appointments' %}" class="nav-item active">
+    <span class="ni">📋</span> My Appointments
+  </a>
+</div>
+<div class="nav-section">
+  <span class="nav-section-label">Account</span>
+  <a href="{% url 'profile' %}" class="nav-item">
+    <span class="ni">👤</span> Profile
+  </a>
+  <a href="{% url 'logout' %}" class="nav-item">
+    <span class="ni">→</span> Sign Out
+  </a>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+<style>
+
+  /* ── Filter tabs ── */
+  .filter-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1.6rem;
+    flex-wrap: wrap;
+  }
+  .ftab {
+    padding: 0.42rem 1rem;
+    border-radius: 99px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-decoration: none;
+  }
+  .ftab:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+  .ftab.active {
+    background: rgba(61,232,192,0.1);
+    color: var(--accent);
+    border-color: rgba(61,232,192,0.25);
+  }
+
+  /* ── Appointments list ── */
+  .appt-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .appt-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: border-color 0.2s, transform 0.2s;
+    animation: slideUp 0.4s cubic-bezier(.22,1,.36,1) both;
+  }
+  .appt-card:hover { border-color: rgba(255,255,255,0.12); transform: translateY(-1px); }
+
+  /* left accent bar based on status */
+  .appt-card.s-pending   { border-left: 3px solid #f5c542; }
+  .appt-card.s-confirmed { border-left: 3px solid var(--accent); }
+  .appt-card.s-cancelled { border-left: 3px solid var(--danger); }
+  .appt-card.s-completed { border-left: 3px solid var(--accent2); }
+
+  .appt-inner {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: start;
+    gap: 16px;
+    padding: 1.2rem 1.4rem;
+  }
+
+  /* Doctor info */
+  .appt-doc-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .appt-avatar {
+    width: 40px; height: 40px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 13px; color: #0b0f1a;
+    flex-shrink: 0;
+  }
+  .appt-doc-name { font-weight: 700; font-size: 0.95rem; color: var(--text); }
+  .appt-doc-spec { font-size: 0.73rem; color: var(--muted); margin-top: 2px; }
+
+  /* Meta pills */
+  .appt-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .meta-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 3px 9px;
+  }
+  .meta-pill-icon { font-size: 0.75rem; }
+
+  /* Reason */
+  .appt-reason {
+    margin-top: 10px;
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-style: italic;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .appt-reason strong { color: var(--text); font-style: normal; font-weight: 600; }
+
+  /* Right column */
+  .appt-right {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+  }
+
+  /* Cancel button */
+  .cancel-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0.42rem 0.85rem;
+    border-radius: 8px;
+    border: 1px solid rgba(248,113,113,0.25);
+    background: rgba(248,113,113,0.07);
+    color: var(--danger);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .cancel-btn:hover { background: rgba(248,113,113,0.15); border-color: var(--danger); }
+
+  /* ── Stats summary row ── */
+  .summary-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 1.8rem;
+  }
+  .sum-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem 1.2rem;
+    animation: slideUp 0.4s cubic-bezier(.22,1,.36,1) both;
+  }
+  .sum-card:nth-child(1) { animation-delay: 0.05s; }
+  .sum-card:nth-child(2) { animation-delay: 0.1s; }
+  .sum-card:nth-child(3) { animation-delay: 0.15s; }
+  .sum-card:nth-child(4) { animation-delay: 0.2s; }
+  .sum-label { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 4px; }
+  .sum-value { font-family: 'DM Serif Display', serif; font-size: 2rem; line-height: 1; color: var(--text); }
+
+  /* ── Empty state ── */
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    color: var(--muted);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+  }
+  .empty-icon  { font-size: 2.5rem; margin-bottom: 10px; }
+  .empty-title { font-weight: 600; font-size: 1rem; color: var(--text); margin-bottom: 6px; }
+  .empty-sub   { font-size: 0.875rem; margin-bottom: 1.4rem; }
+
+  /* ── Cancel confirm modal ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.65);
+    backdrop-filter: blur(4px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 420px;
+    overflow: hidden;
+    animation: slideUp 0.3s cubic-bezier(.22,1,.36,1) both;
+  }
+  .modal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 1.1rem 1.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-title { font-weight: 700; font-size: 1rem; color: var(--text); }
+  .modal-close {
+    width: 28px; height: 28px; border-radius: 7px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem; transition: all 0.15s;
+  }
+  .modal-close:hover { color: var(--text); }
+  .modal-body { padding: 1.4rem; }
+  .modal-text { color: var(--muted); font-size: 0.875rem; line-height: 1.6; margin-bottom: 1.4rem; }
+  .modal-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn-no {
+    padding: 0.7rem; border-radius: 10px;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem; font-weight: 600; cursor: pointer; transition: all 0.15s;
+  }
+  .btn-no:hover { color: var(--text); }
+  .btn-yes-cancel {
+    padding: 0.7rem; border-radius: 10px; border: none;
+    background: linear-gradient(135deg, var(--danger), #c0392b);
+    color: #fff; font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: all 0.2s;
+  }
+  .btn-yes-cancel:hover { box-shadow: 0 4px 16px rgba(248,113,113,0.3); }
+
+  @media (max-width: 700px) {
+    .summary-row { grid-template-columns: repeat(2, 1fr); }
+    .appt-inner  { grid-template-columns: 1fr; }
+    .appt-right  { flex-direction: row; align-items: center; }
+  }
+</style>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">My Appointments 📋</div>
+    <div class="topbar-sub">Track and manage all your scheduled visits.</div>
+  </div>
+  <a href="{% url 'book_appointment' %}" class="dash-btn">＋ Book New</a>
+</div>
+
+<!-- Summary stats -->
+<div class="summary-row">
+  <div class="sum-card">
+    <div class="sum-label">Total</div>
+    <div class="sum-value">{{ total_count }}</div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-label">Upcoming</div>
+    <div class="sum-value" style="color:var(--accent);">{{ upcoming_count }}</div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-label">Completed</div>
+    <div class="sum-value" style="color:var(--accent2);">{{ completed_count }}</div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-label">Cancelled</div>
+    <div class="sum-value" style="color:var(--danger);">{{ cancelled_count }}</div>
+  </div>
+</div>
+
+<!-- Filter tabs -->
+<div class="filter-tabs">
+  <a href="?status=all"       class="ftab {% if active_filter == 'all' %}active{% endif %}">All ({{ total_count }})</a>
+  <a href="?status=pending"   class="ftab {% if active_filter == 'pending' %}active{% endif %}">Pending</a>
+  <a href="?status=confirmed" class="ftab {% if active_filter == 'confirmed' %}active{% endif %}">Confirmed</a>
+  <a href="?status=completed" class="ftab {% if active_filter == 'completed' %}active{% endif %}">Completed</a>
+  <a href="?status=cancelled" class="ftab {% if active_filter == 'cancelled' %}active{% endif %}">Cancelled</a>
+</div>
+
+<!-- Appointments list -->
+<div class="appt-list">
+  {% if appointments %}
+    {% for appt in appointments %}
+    <div class="appt-card s-{{ appt.status }}" style="animation-delay: {{ forloop.counter0 }}00ms">
+      <div class="appt-inner">
+
+        <!-- Left: doctor + details -->
+        <div>
+          <div class="appt-doc-row">
+            <div class="appt-avatar">
+              {{ appt.doctor.first_name|first|upper }}{{ appt.doctor.last_name|first|upper }}
+            </div>
+            <div>
+              <div class="appt-doc-name">Dr. {{ appt.doctor.get_full_name }}</div>
+              <div class="appt-doc-spec">
+                {% if appt.doctor.specialization %}{{ appt.doctor.specialization }}{% else %}General Practitioner{% endif %}
+              </div>
+            </div>
+          </div>
+
+          <div class="appt-meta">
+            <span class="meta-pill">
+              <span class="meta-pill-icon">📅</span>
+              {{ appt.appointment_date|date:"D, M j, Y" }}
+            </span>
+            <span class="meta-pill">
+              <span class="meta-pill-icon">🕐</span>
+              {{ appt.start_time|time:"g:i A" }} – {{ appt.end_time|time:"g:i A" }}
+            </span>
+            <span class="meta-pill">
+              <span class="meta-pill-icon">🔖</span>
+              #{{ appt.pk }}
+            </span>
+          </div>
+
+          {% if appt.reason %}
+          <div class="appt-reason">
+            <strong>Reason:</strong> {{ appt.reason }}
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Right: status badge + cancel -->
+        <div class="appt-right">
+          <span class="badge badge-{{ appt.status }}">{{ appt.get_status_display }}</span>
+
+          {% if appt.status == 'pending' or appt.status == 'confirmed' %}
+            {% if appt.appointment_date >= today %}
+            <button
+              class="cancel-btn"
+              onclick="openCancelModal({{ appt.pk }}, 'Dr. {{ appt.doctor.get_full_name|escapejs }}', '{{ appt.appointment_date|date:"M j, Y"|escapejs }}')"
+            >
+              ✕ Cancel
+            </button>
+            {% endif %}
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+    {% endfor %}
+
+  {% else %}
+    <div class="empty-state">
+      <div class="empty-icon">🗓</div>
+      <div class="empty-title">
+        {% if active_filter == 'all' %}No appointments yet{% else %}No {{ active_filter }} appointments{% endif %}
+      </div>
+      <div class="empty-sub">
+        {% if active_filter == 'all' %}
+          You haven't booked any appointments yet.
+        {% else %}
+          You have no {{ active_filter }} appointments.
+        {% endif %}
+      </div>
+      {% if active_filter == 'all' %}
+      <a href="{% url 'book_appointment' %}" class="dash-btn">＋ Book Your First Appointment</a>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+
+
+<!-- ── Cancel confirm modal ── -->
+<div class="modal-overlay" id="cancelModal" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="modal-title">Cancel Appointment</span>
+      <button class="modal-close" onclick="closeCancelModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-text" id="cancelModalText">
+        Are you sure you want to cancel your appointment?
+      </div>
+      <div class="modal-actions">
+        <button class="btn-no" onclick="closeCancelModal()">Keep It</button>
+        <a class="btn-yes-cancel" id="cancelConfirmLink" href="#">Yes, Cancel</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden cancel form -->
+<form id="cancelForm" method="POST" action="" style="display:none;">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="cancel" />
+</form>
+
+
+<script>
+  let cancelApptId = null;
+
+  function openCancelModal(apptId, doctorName, date) {
+    cancelApptId = apptId;
+    document.getElementById('cancelModalText').innerHTML =
+      `Are you sure you want to cancel your appointment with <strong style="color:var(--text)">${doctorName}</strong> on <strong style="color:var(--text)">${date}</strong>? This cannot be undone.`;
+
+    const link = document.getElementById('cancelConfirmLink');
+    link.href = `/appointments/${apptId}/cancel/`;
+
+    document.getElementById('cancelModal').classList.add('open');
+  }
+
+  function closeCancelModal() {
+    document.getElementById('cancelModal').classList.remove('open');
+    cancelApptId = null;
+  }
+
+  function handleOverlayClick(e) {
+    if (e.target.id === 'cancelModal') closeCancelModal();
+  }
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeCancelModal();
+  });
+</script>
+
+{% endblock %}

@@ -1,0 +1,147 @@
+{% extends "dashboard_base.html" %} {% block page_title %}Patient Dashboard
+{%endblock %} {% block user_role %}Patient{% endblock %} {% block nav_links %}
+<div class="nav-section">
+    <span class="nav-section-label">Main</span>
+    <a href="{% url 'patient_dashboard' %}" class="nav-item active">
+        <span class="ni">⊞</span> Dashboard
+    </a>
+    <a href="{% url 'book_appointment' %}" class="nav-item">
+        <span class="ni">➕</span> Book Appointment
+    </a>
+    <a href="{% url 'patient_appointments' %}" class="nav-item">
+        <span class="ni">📋</span> My Appointments
+    </a>
+</div>
+<div class="nav-section">
+    <span class="nav-section-label">Account</span>
+    <a href="{% url 'profile' %}" class="nav-item">
+        <span class="ni">👤</span> Profile
+    </a>
+    <a href="{% url 'logout' %}" class="nav-item">
+        <span class="ni">→</span> Sign Out
+    </a>
+</div>
+{% endblock %} {% block dashboard_content %}
+
+<!-- Topbar -->
+<div class="topbar">
+    <div>
+        <div class="topbar-title">Hello, {{ user.first_name }} 👋</div>
+        <div class="topbar-sub">
+            {% now "l, F j, Y" %} — Manage your appointments.
+        </div>
+    </div>
+    <a href="{% url 'book_appointment' %}" class="dash-btn"
+        >+ Book Appointment</a
+    >
+</div>
+
+<!-- Stats -->
+<div class="stats-row">
+    <div class="stat s-teal">
+        <div class="stat-label">Total Booked</div>
+        <div class="stat-value">{{ stats.total }}</div>
+        <div class="stat-sub">All time</div>
+    </div>
+    <div class="stat s-blue">
+        <div class="stat-label">Upcoming</div>
+        <div class="stat-value">{{ stats.upcoming }}</div>
+        <div class="stat-sub">Scheduled ahead</div>
+    </div>
+    <div class="stat s-teal">
+        <div class="stat-label">Completed</div>
+        <div class="stat-value">{{ stats.completed }}</div>
+        <div class="stat-sub">Visits done</div>
+    </div>
+    <div class="stat s-red">
+        <div class="stat-label">Cancelled</div>
+        <div class="stat-value">{{ stats.cancelled }}</div>
+        <div class="stat-sub">Cancelled visits</div>
+    </div>
+</div>
+
+<!-- Content grid -->
+<div class="content-grid">
+    <!-- Upcoming appointments -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Upcoming Appointments</span>
+            <a href="{% url 'patient_appointments' %}" class="panel-link"
+                >View all →</a
+            >
+        </div>
+        {% if upcoming_appointments %}
+        <div class="tbl-head tbl-4">
+            <span>Doctor</span><span>Date</span><span>Time</span
+            ><span>Status</span>
+        </div>
+        {% for appt in upcoming_appointments %}
+        <div class="tbl-row tbl-4">
+            <div>
+                <div class="row-name">Dr. {{ appt.doctor.get_full_name }}</div>
+                <div class="row-sub">
+                    {{ appt.reason|default:"General
+                    Consultation"|truncatechars:38 }}
+                </div>
+            </div>
+            <div class="row-date">
+                {{ appt.appointment_date|date:"M j, Y" }}
+            </div>
+            <div class="row-time">{{ appt.start_time|time:"g:i A" }}</div>
+            <span class="badge badge-{{ appt.status }}">{{ appt.status }}</span>
+        </div>
+        {% endfor %} {% else %}
+        <div class="empty">
+            <div class="empty-icon">📅</div>
+            No upcoming appointments.
+            <br />
+            <a
+                href="{% url 'book_appointment' %}"
+                style="
+                    color: var(--accent);
+                    margin-top: 8px;
+                    display: inline-block;
+                "
+                >Book one now →</a
+            >
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Past appointments side panel -->
+    <div class="panel">
+        <div class="panel-head">
+            <span class="panel-title">Past Appointments</span>
+        </div>
+        {% if past_appointments %} {% for appt in past_appointments %}
+        <div
+            style="
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.85rem 1.4rem;
+                border-bottom: 1px solid var(--border);
+            "
+        >
+            <div>
+                <div class="row-name" style="font-size: 0.82rem">
+                    Dr. {{ appt.doctor.get_full_name }}
+                </div>
+                <div class="row-sub">
+                    {{ appt.appointment_date|date:"M j, Y" }} · {{
+                    appt.start_time|time:"g:i A" }}
+                </div>
+            </div>
+            <span class="badge badge-{{ appt.status }}">{{ appt.status }}</span>
+        </div>
+        {% endfor %} {% else %}
+        <div class="empty">
+            <div class="empty-icon">🩺</div>
+            No past appointments yet.
+        </div>
+        {% endif %}
+    </div>
+</div>
+<!-- /content-grid -->
+
+{% endblock %}

@@ -1,0 +1,158 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Booking Confirmed{% endblock %}
+{% block user_role %}Patient{% endblock %}
+
+{% block nav_links %}
+<div class="nav-section">
+  <span class="nav-section-label">Main</span>
+  <a href="{% url 'patient_dashboard' %}" class="nav-item">
+    <span class="ni">⊞</span> Dashboard
+  </a>
+  <a href="{% url 'book_appointment' %}" class="nav-item">
+    <span class="ni">＋</span> Book Appointment
+  </a>
+  <a href="{% url 'patient_appointments' %}" class="nav-item active">
+    <span class="ni">📋</span> My Appointments
+  </a>
+</div>
+<div class="nav-section">
+  <span class="nav-section-label">Account</span>
+  <a href="{% url 'profile' %}" class="nav-item">
+    <span class="ni">👤</span> Profile
+  </a>
+  <a href="{% url 'logout' %}" class="nav-item">
+    <span class="ni">→</span> Sign Out
+  </a>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+<style>
+  .success-wrap {
+    max-width: 520px;
+    margin: 4rem auto;
+    text-align: center;
+  }
+
+  .success-icon-wrap {
+    width: 72px; height: 72px;
+    border-radius: 50%;
+    background: rgba(61,232,192,0.12);
+    border: 1px solid rgba(61,232,192,0.25);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 1.2rem;
+    animation: pop 0.5s cubic-bezier(.22,1,.36,1) both;
+  }
+  @keyframes pop {
+    from { transform: scale(0.4); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  .success-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 2rem;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.4rem;
+    color: var(--text);
+  }
+  .success-sub {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin-bottom: 2rem;
+    line-height: 1.6;
+  }
+
+  .appt-card {
+    background: var(--panel);
+    border: 1px solid rgba(61,232,192,0.2);
+    border-radius: 16px;
+    padding: 1.4rem;
+    margin-bottom: 1.8rem;
+    text-align: left;
+    animation: slideUp 0.4s 0.15s cubic-bezier(.22,1,.36,1) both;
+  }
+
+  .appt-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 0.875rem;
+  }
+  .appt-row:not(:last-child) {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+  .appt-key { color: var(--muted); font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+  .appt-val { font-weight: 600; color: var(--text); text-align: right; max-width: 280px; }
+
+  .actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+    animation: slideUp 0.4s 0.25s cubic-bezier(.22,1,.36,1) both;
+  }
+  .btn-secondary {
+    padding: 0.65rem 1.3rem;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.15s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .btn-secondary:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+</style>
+
+<div class="success-wrap">
+  <div class="success-icon-wrap">✅</div>
+  <div class="success-title">You're booked!</div>
+  <div class="success-sub">
+    Your appointment has been requested.<br>
+    You'll be notified once the doctor confirms.
+  </div>
+
+  <div class="appt-card">
+    <div class="appt-row">
+      <span class="appt-key">Doctor</span>
+      <span class="appt-val">Dr. {{ appointment.doctor.get_full_name }}</span>
+    </div>
+    <div class="appt-row">
+      <span class="appt-key">Date</span>
+      <span class="appt-val">{{ appointment.appointment_date|date:"l, F j, Y" }}</span>
+    </div>
+    <div class="appt-row">
+      <span class="appt-key">Time</span>
+      <span class="appt-val">{{ appointment.start_time|time:"g:i A" }} – {{ appointment.end_time|time:"g:i A" }}</span>
+    </div>
+    <div class="appt-row">
+      <span class="appt-key">Status</span>
+      <span class="badge badge-pending">Pending Confirmation</span>
+    </div>
+    {% if appointment.reason %}
+    <div class="appt-row">
+      <span class="appt-key">Reason</span>
+      <span class="appt-val">{{ appointment.reason }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="actions">
+    <a href="{% url 'patient_appointments' %}" class="dash-btn">
+      📋 View My Appointments
+    </a>
+    <a href="{% url 'book_appointment' %}" class="btn-secondary">
+      ＋ Book Another
+    </a>
+  </div>
+</div>
+{% endblock %}

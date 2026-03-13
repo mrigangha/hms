@@ -1,0 +1,80 @@
+{% extends "dashboard_base.html" %} {% block page_title %}Slot Unavailable{%
+endblock %} {% block user_role %}Patient{% endblock %} {% block nav_links %}
+<div class="nav-section">
+    <span class="nav-section-label">Main</span>
+    <a href="{% url 'patient_dashboard' %}" class="nav-item">
+        <span class="ni">⊞</span> Dashboard
+    </a>
+    <a href="{% url 'book_appointment' %}" class="nav-item active">
+        <span class="ni">＋</span> Book Appointment
+    </a>
+    <a href="{% url 'patient_appointments' %}" class="nav-item">
+        <span class="ni">📋</span> My Appointments
+    </a>
+</div>
+<div class="nav-section">
+    <span class="nav-section-label">Account</span>
+    <a href="{% url 'profile' %}" class="nav-item">
+        <span class="ni">👤</span> Profile
+    </a>
+    <a href="{% url 'logout' %}" class="nav-item">
+        <span class="ni">→</span> Sign Out
+    </a>
+</div>
+{% endblock %} {% block dashboard_content %}
+<style>
+    .fail-wrap {
+        max-width: 480px;
+        margin: 4rem auto;
+        text-align: center;
+    }
+    .fail-icon-wrap {
+        width: 72px;
+        height: 72px;
+        border-radius: 50%;
+        background: rgba(248, 113, 113, 0.1);
+        border: 1px solid rgba(248, 113, 113, 0.25);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        margin: 0 auto 1.2rem;
+        animation: pop 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+    }
+    @keyframes pop {
+        from {
+            transform: scale(0.4);
+            opacity: 0;
+        }
+        to {
+            transform: scale(1);
+            opacity: 1;
+        }
+    }
+    .fail-title {
+        font-family: "DM Serif Display", serif;
+        font-size: 1.9rem;
+        letter-spacing: -0.03em;
+        margin-bottom: 0.4rem;
+        color: var(--text);
+    }
+    .fail-msg {
+        color: var(--muted);
+        font-size: 0.9rem;
+        margin-bottom: 2rem;
+        line-height: 1.6;
+    }
+</style>
+
+<div class="fail-wrap">
+    <div class="fail-icon-wrap">⚠️</div>
+    <div class="fail-title">Slot Unavailable</div>
+    <div class="fail-msg">
+        {{ message|default:"This slot is no longer available. Please choose
+        another." }}
+    </div>
+    <a href="{% url 'book_appointment' %}" class="dash-btn"
+        >← Choose Another Slot</a
+    >
+</div>
+{% endblock %}

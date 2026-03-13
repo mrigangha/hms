@@ -1,0 +1,620 @@
+{% extends "dashboard_base.html" %}
+
+{% block page_title %}Profile{% endblock %}
+{% block user_role %}{% if user.is_doctor %}Physician{% elif user.is_patient %}Patient{% else %}Admin{% endif %}{% endblock %}
+
+{% block nav_links %}
+<div class="nav-section">
+  <span class="nav-section-label">Main</span>
+  {% if user.is_doctor %}
+    <a href="{% url 'doctor_dashboard' %}"    class="nav-item"><span class="ni">⊞</span> Dashboard</a>
+    <a href="{% url 'add_availability' %}"    class="nav-item"><span class="ni">◷</span> My Availability</a>
+    <a href="{% url 'doctor_appointments' %}" class="nav-item"><span class="ni">📋</span> Appointments</a>
+  {% else %}
+    <a href="{% url 'patient_dashboard' %}"    class="nav-item"><span class="ni">⊞</span> Dashboard</a>
+    <a href="{% url 'book_appointment' %}"     class="nav-item"><span class="ni">＋</span> Book Appointment</a>
+    <a href="{% url 'patient_appointments' %}" class="nav-item"><span class="ni">📋</span> My Appointments</a>
+  {% endif %}
+</div>
+<div class="nav-section">
+  <span class="nav-section-label">Account</span>
+  <a href="{% url 'profile' %}" class="nav-item active"><span class="ni">👤</span> Profile</a>
+  <a href="{% url 'logout' %}"  class="nav-item"><span class="ni">→</span> Sign Out</a>
+</div>
+{% endblock %}
+
+{% block dashboard_content %}
+<style>
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+
+  /* ── Sidebar ── */
+  .profile-sidebar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    position: sticky;
+    top: 2rem;
+  }
+  .profile-hero {
+    padding: 2rem 1.4rem 1.4rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .profile-big-avatar {
+    width: 72px; height: 72px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 24px; color: #0b0f1a;
+    margin: 0 auto 1rem;
+  }
+  .profile-display-name {
+    font-family: 'DM Serif Display', serif;
+    font-size: 1.15rem; color: var(--text);
+    letter-spacing: -0.02em; margin-bottom: 4px;
+  }
+  .profile-username { font-size: .75rem; color: var(--muted); margin-bottom: 8px; }
+  .profile-role-badge {
+    display: inline-flex; align-items: center;
+    padding: 3px 12px; border-radius: 99px;
+    font-size: .7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .08em;
+  }
+  .role-doctor  { background:rgba(61,232,192,.1);  color:var(--accent);  border:1px solid rgba(61,232,192,.2); }
+  .role-patient { background:rgba(79,142,247,.1);  color:var(--accent2); border:1px solid rgba(79,142,247,.2); }
+  .role-admin   { background:rgba(245,197,66,.1);  color:#f5c542;        border:1px solid rgba(245,197,66,.2); }
+  .profile-bio-text {
+    font-size: .78rem; color: var(--muted);
+    margin-top: 10px; line-height: 1.5; font-style: italic;
+  }
+
+  /* Side tabs */
+  .side-tabs { padding: .8rem .7rem; }
+  .side-tab {
+    display: flex; align-items: center; gap: 9px;
+    padding: .52rem .8rem; border-radius: 9px;
+    color: var(--muted); font-size: .84rem; font-weight: 500;
+    cursor: pointer; transition: all .15s;
+    border: none; background: transparent;
+    width: 100%; text-align: left; margin-bottom: 2px;
+  }
+  .side-tab:hover { background: rgba(255,255,255,.05); color: var(--text); }
+  .side-tab.active { background: rgba(61,232,192,.1); color: var(--accent); }
+  .side-tab .ni { font-size: .9rem; }
+  .gcal-dot {
+    margin-left: auto; width: 7px; height: 7px;
+    border-radius: 50%; background: var(--accent);
+    flex-shrink: 0; display: inline-block;
+  }
+
+  /* ── Form sections ── */
+  .profile-sections { display: flex; flex-direction: column; gap: 16px; }
+  .form-section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    display: none;
+    animation: slideUp .3s cubic-bezier(.22,1,.36,1) both;
+  }
+  .form-section.visible { display: block; }
+  .section-head {
+    padding: 1rem 1.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-title { font-weight: 600; font-size: .9rem; color: var(--text); }
+  .section-sub   { font-size: .72rem; color: var(--muted); margin-top: 2px; }
+  .section-body  { padding: 1.4rem; }
+
+  /* Fields */
+  .fields-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .field-full  { grid-column: 1 / -1; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label {
+    font-size: .7rem; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--muted); font-weight: 600;
+  }
+  .field input,
+  .field select,
+  .field textarea {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .62rem .9rem;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: .875rem;
+    outline: none;
+    transition: border-color .2s, box-shadow .2s;
+    color-scheme: dark;
+    width: 100%;
+  }
+  .field input:focus,
+  .field select:focus,
+  .field textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(61,232,192,.1);
+  }
+  .field textarea { resize: vertical; min-height: 80px; }
+  .field select option { background: var(--panel); }
+  .field-readonly {
+    background: rgba(255,255,255,.03);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: .62rem .9rem;
+    font-size: .875rem; color: var(--muted);
+  }
+
+  /* Save row */
+  .save-row {
+    display: flex; justify-content: flex-end;
+    margin-top: 1.2rem; padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+  }
+  .save-btn {
+    padding: .65rem 1.6rem; border-radius: 10px; border: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #0b0f1a; font-family: 'DM Sans', sans-serif;
+    font-size: .875rem; font-weight: 700;
+    cursor: pointer; transition: all .2s;
+  }
+  .save-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(61,232,192,.25); }
+
+  /* Alerts */
+  .alert {
+    padding: .75rem 1rem; border-radius: 10px;
+    font-size: .82rem; font-weight: 500; margin-bottom: 1rem;
+  }
+  .alert-success { background:rgba(61,232,192,.08);  border:1px solid rgba(61,232,192,.2);  color:var(--accent); }
+  .alert-error   { background:rgba(248,113,113,.1);  border:1px solid rgba(248,113,113,.25); color:var(--danger); }
+  .alert-info    { background:rgba(79,142,247,.08);  border:1px solid rgba(79,142,247,.2);   color:var(--accent2); }
+
+  /* Password strength */
+  .pw-strength { margin-top: 4px; height: 3px; border-radius: 99px; background: var(--border); overflow: hidden; }
+  .pw-strength-bar { height: 100%; border-radius: 99px; width: 0; transition: width .3s, background .3s; }
+
+  /* GCal */
+  .gcal-status-card {
+    display: flex; align-items: center; gap: 14px;
+    padding: 1rem 1.2rem; border-radius: 12px; margin-bottom: 1.4rem;
+  }
+  .gcal-status-card.connected    { background:rgba(61,232,192,.06); border:1px solid rgba(61,232,192,.2); }
+  .gcal-status-card.disconnected { background:rgba(255,255,255,.03); border:1px solid var(--border); }
+  .gcal-icon {
+    width: 42px; height: 42px; border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; flex-shrink: 0;
+  }
+  .gcal-icon.connected    { background: rgba(61,232,192,.15); }
+  .gcal-icon.disconnected { background: rgba(255,255,255,.05); }
+  .gcal-info-box {
+    padding: 1rem 1.2rem; border-radius: 12px;
+    font-size: .82rem; color: var(--muted); line-height: 1.8; margin-bottom: 1.4rem;
+  }
+  .gcal-info-box.how    { background:rgba(79,142,247,.06); border:1px solid rgba(79,142,247,.15); }
+  .gcal-info-box.synced { background:rgba(255,255,255,.03); border:1px solid var(--border); }
+  .gcal-info-title { font-weight: 600; margin-bottom: 6px; font-size: .84rem; }
+  .gcal-connect-btn {
+    display: inline-flex; align-items: center; gap: 9px;
+    padding: .7rem 1.4rem; border-radius: 10px; border: none;
+    text-decoration: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #0b0f1a; font-size: .9rem; font-weight: 700; transition: all .2s;
+  }
+  .gcal-connect-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(61,232,192,.25); }
+  .gcal-disconnect-btn {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: .6rem 1.2rem; border-radius: 10px;
+    border: 1px solid rgba(248,113,113,.25);
+    background: rgba(248,113,113,.07); color: var(--danger);
+    font-size: .855rem; font-weight: 600; text-decoration: none; transition: all .15s;
+  }
+  .gcal-disconnect-btn:hover { background: rgba(248,113,113,.15); border-color: var(--danger); }
+  .active-badge {
+    font-size: .7rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .08em; padding: 3px 10px; border-radius: 99px;
+    background: rgba(61,232,192,.1); color: var(--accent);
+    border: 1px solid rgba(61,232,192,.2); white-space: nowrap;
+  }
+
+  @media (max-width: 860px) {
+    .profile-grid    { grid-template-columns: 1fr; }
+    .profile-sidebar { position: static; }
+  }
+  @media (max-width: 560px) {
+    .fields-grid { grid-template-columns: 1fr; }
+  }
+</style>
+
+<!-- Topbar -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">My Profile 👤</div>
+    <div class="topbar-sub">Manage your account information and settings.</div>
+  </div>
+</div>
+
+<div class="profile-grid">
+
+  <!-- ══════════════════════════
+       SIDEBAR
+  ══════════════════════════ -->
+  <div class="profile-sidebar">
+    <div class="profile-hero">
+      <div class="profile-big-avatar">{{ user.get_initials }}</div>
+      <div class="profile-display-name">{{ user.get_full_name|default:user.username }}</div>
+      <div class="profile-username">@{{ user.username }}</div>
+      <span class="profile-role-badge role-{{ user.role }}">{{ user.role }}</span>
+      {% if user.profile_bio %}
+        <div class="profile-bio-text">{{ user.profile_bio }}</div>
+      {% endif %}
+    </div>
+
+    <div class="side-tabs">
+      <button class="side-tab active" onclick="showSection('personal', this)">
+        <span class="ni">👤</span> Personal Info
+      </button>
+      {% if user.is_doctor %}
+      <button class="side-tab" onclick="showSection('doctor', this)">
+        <span class="ni">🩺</span> Professional
+      </button>
+      {% endif %}
+      {% if user.is_patient %}
+      <button class="side-tab" onclick="showSection('patient', this)">
+        <span class="ni">🏥</span> Medical Info
+      </button>
+      {% endif %}
+      <button class="side-tab" onclick="showSection('password', this)">
+        <span class="ni">🔒</span> Password
+      </button>
+      <button class="side-tab" onclick="showSection('gcal', this)">
+        <span class="ni">📅</span> Google Calendar
+        {% if user.gcal_connected %}<span class="gcal-dot"></span>{% endif %}
+      </button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════
+       FORM SECTIONS
+  ══════════════════════════ -->
+  <div class="profile-sections">
+
+    <!-- ── Personal Info ── -->
+    <div class="form-section visible" id="section-personal">
+      <div class="section-head">
+        <div class="section-title">Personal Information</div>
+        <div class="section-sub">Your basic profile details</div>
+      </div>
+      <div class="section-body">
+
+        {% if success == 'personal' %}
+          <div class="alert alert-success">✓ Personal information updated successfully.</div>
+        {% endif %}
+        {% if error and success != 'password' and success != 'doctor' and success != 'patient' and success != 'gcal_connected' and success != 'gcal_disconnected' %}
+          <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="personal" />
+          <div class="fields-grid">
+            <div class="field">
+              <label>First Name</label>
+              <input type="text" name="first_name" value="{{ user.first_name }}" placeholder="First name" />
+            </div>
+            <div class="field">
+              <label>Last Name</label>
+              <input type="text" name="last_name" value="{{ user.last_name }}" placeholder="Last name" />
+            </div>
+            <div class="field">
+              <label>Email</label>
+              <input type="email" name="email" value="{{ user.email }}" placeholder="your@email.com" />
+            </div>
+            <div class="field">
+              <label>Phone</label>
+              <input type="tel" name="phone" value="{{ user.phone }}" placeholder="+1 555 000 0000" />
+            </div>
+            <div class="field">
+              <label>Date of Birth</label>
+              <input type="date" name="date_of_birth"
+                value="{% if user.date_of_birth %}{{ user.date_of_birth|date:'Y-m-d' }}{% endif %}" />
+            </div>
+            <div class="field">
+              <label>Username</label>
+              <div class="field-readonly">{{ user.username }}</div>
+            </div>
+            <div class="field field-full">
+              <label>Address</label>
+              <input type="text" name="address" value="{{ user.address }}" placeholder="Street, City, Country" />
+            </div>
+            <div class="field field-full">
+              <label>Bio</label>
+              <textarea name="profile_bio" placeholder="A short bio about yourself…">{{ user.profile_bio }}</textarea>
+            </div>
+          </div>
+          <div class="save-row">
+            <button type="submit" class="save-btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Doctor Professional ── -->
+    {% if user.is_doctor %}
+    <div class="form-section" id="section-doctor">
+      <div class="section-head">
+        <div class="section-title">Professional Information</div>
+        <div class="section-sub">Details visible to patients when booking</div>
+      </div>
+      <div class="section-body">
+
+        {% if success == 'doctor' %}
+          <div class="alert alert-success">✓ Professional information updated.</div>
+        {% endif %}
+
+        <form method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="doctor" />
+          <div class="fields-grid">
+            <div class="field">
+              <label>Specialization</label>
+              <input type="text" name="specialization"
+                value="{{ user.specialization }}" placeholder="e.g. Cardiologist" />
+            </div>
+            <div class="field">
+              <label>License Number</label>
+              <input type="text" name="license_number"
+                value="{{ user.license_number }}" placeholder="Medical license #" />
+            </div>
+            <div class="field">
+              <label>Years of Experience</label>
+              <input type="number" name="years_experience" min="0" max="60"
+                value="{{ user.years_experience|default:'' }}" placeholder="e.g. 10" />
+            </div>
+            <div class="field">
+              <label>Consultation Fee (₹)</label>
+              <input type="number" name="consultation_fee" step="0.01" min="0"
+                value="{{ user.consultation_fee|default:'' }}" placeholder="e.g. 500" />
+            </div>
+          </div>
+          <div class="save-row">
+            <button type="submit" class="save-btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Patient Medical Info ── -->
+    {% if user.is_patient %}
+    <div class="form-section" id="section-patient">
+      <div class="section-head">
+        <div class="section-title">Medical Information</div>
+        <div class="section-sub">Health details and emergency contact</div>
+      </div>
+      <div class="section-body">
+
+        {% if success == 'patient' %}
+          <div class="alert alert-success">✓ Medical information updated.</div>
+        {% endif %}
+
+        <form method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="patient" />
+          <div class="fields-grid">
+
+            <div class="field">
+              <label>Blood Group</label>
+              <select name="blood_group">
+                <option value="">-- Select --</option>
+                <option value="A+"  {% if user.blood_group == "A+"  %}selected{% endif %}>A+</option>
+                <option value="A-"  {% if user.blood_group == "A-"  %}selected{% endif %}>A-</option>
+                <option value="B+"  {% if user.blood_group == "B+"  %}selected{% endif %}>B+</option>
+                <option value="B-"  {% if user.blood_group == "B-"  %}selected{% endif %}>B-</option>
+                <option value="AB+" {% if user.blood_group == "AB+" %}selected{% endif %}>AB+</option>
+                <option value="AB-" {% if user.blood_group == "AB-" %}selected{% endif %}>AB-</option>
+                <option value="O+"  {% if user.blood_group == "O+"  %}selected{% endif %}>O+</option>
+                <option value="O-"  {% if user.blood_group == "O-"  %}selected{% endif %}>O-</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label>Emergency Contact Name</label>
+              <input type="text" name="emergency_contact_name"
+                value="{{ user.emergency_contact_name }}" placeholder="Full name" />
+            </div>
+            <div class="field">
+              <label>Emergency Contact Phone</label>
+              <input type="tel" name="emergency_contact_phone"
+                value="{{ user.emergency_contact_phone }}" placeholder="+1 555 000 0000" />
+            </div>
+            <div class="field field-full">
+              <label>Known Allergies</label>
+              <textarea name="allergies"
+                placeholder="e.g. Penicillin, Peanuts…">{{ user.allergies }}</textarea>
+            </div>
+
+          </div>
+          <div class="save-row">
+            <button type="submit" class="save-btn">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- ── Change Password ── -->
+    <div class="form-section" id="section-password">
+      <div class="section-head">
+        <div class="section-title">Change Password</div>
+        <div class="section-sub">Use a strong password of at least 8 characters</div>
+      </div>
+      <div class="section-body">
+
+        {% if success == 'password' %}
+          <div class="alert alert-success">✓ Password changed successfully.</div>
+        {% endif %}
+        {% if error and success != 'personal' and success != 'doctor' and success != 'patient' and success != 'gcal_connected' and success != 'gcal_disconnected' %}
+          <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST">
+          {% csrf_token %}
+          <input type="hidden" name="section" value="password" />
+          <div class="fields-grid">
+            <div class="field field-full">
+              <label>Current Password</label>
+              <input type="password" name="current_password" placeholder="Enter current password" />
+            </div>
+            <div class="field">
+              <label>New Password</label>
+              <input type="password" name="new_password" id="newPw"
+                placeholder="Min 8 characters" oninput="updateStrength(this.value)" />
+              <div class="pw-strength">
+                <div class="pw-strength-bar" id="pwBar"></div>
+              </div>
+            </div>
+            <div class="field">
+              <label>Confirm New Password</label>
+              <input type="password" name="confirm_password" placeholder="Repeat new password" />
+            </div>
+          </div>
+          <div class="save-row">
+            <button type="submit" class="save-btn">Update Password</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ── Google Calendar ── -->
+    <div class="form-section" id="section-gcal">
+      <div class="section-head">
+        <div class="section-title">Google Calendar</div>
+        <div class="section-sub">Sync appointments automatically to your Google Calendar</div>
+      </div>
+      <div class="section-body">
+
+        {% if success == 'gcal_connected' %}
+          <div class="alert alert-success">✓ Google Calendar connected successfully.</div>
+        {% elif success == 'gcal_disconnected' %}
+          <div class="alert alert-info">Google Calendar disconnected.</div>
+        {% elif error and 'Google' in error %}
+          <div class="alert alert-error">{{ error }}</div>
+        {% endif %}
+
+        {% if user.gcal_connected %}
+
+          <!-- Connected -->
+          <div class="gcal-status-card connected">
+            <div class="gcal-icon connected">📅</div>
+            <div style="flex:1;">
+              <div style="font-weight:600;font-size:.9rem;color:var(--text);">
+                Google Calendar connected
+              </div>
+              <div style="font-size:.75rem;color:var(--muted);margin-top:2px;">
+                New appointments will automatically appear in your Google Calendar.
+              </div>
+            </div>
+            <span class="active-badge">✓ Active</span>
+          </div>
+
+          <div class="gcal-info-box synced">
+            <div class="gcal-info-title" style="color:var(--text);">What gets synced</div>
+            ✓ &nbsp;New booking → calendar event created for both doctor &amp; patient<br>
+            ✓ &nbsp;Cancellation → calendar event deleted automatically<br>
+            ✓ &nbsp;Event includes name, time slot, and reason for visit
+          </div>
+
+          <a href="{% url 'gcal_disconnect' %}"
+             class="gcal-disconnect-btn"
+             onclick="return confirm('Disconnect Google Calendar? Existing calendar events will not be deleted.')">
+            🔌 Disconnect Google Calendar
+          </a>
+
+        {% else %}
+
+          <!-- Not connected -->
+          <div class="gcal-status-card disconnected">
+            <div class="gcal-icon disconnected">📅</div>
+            <div>
+              <div style="font-weight:600;font-size:.9rem;color:var(--text);">Not connected</div>
+              <div style="font-size:.75rem;color:var(--muted);margin-top:2px;">
+                Connect to auto-sync all your appointments.
+              </div>
+            </div>
+          </div>
+
+          <div class="gcal-info-box how">
+            <div class="gcal-info-title" style="color:var(--accent2);">How it works</div>
+            1. Click <strong style="color:var(--text);">Connect Google Calendar</strong> below<br>
+            2. Sign in with your Google account &amp; approve access<br>
+            3. Every appointment automatically creates a Google Calendar event
+          </div>
+
+          <a href="{% url 'gcal_connect' %}" class="gcal-connect-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="#0b0f1a">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Connect Google Calendar
+          </a>
+
+        {% endif %}
+
+      </div>
+    </div>
+
+  </div><!-- /profile-sections -->
+</div><!-- /profile-grid -->
+
+<script>
+  /* ── Section switcher ── */
+  function showSection(name, btn) {
+    document.querySelectorAll('.form-section').forEach(s => s.classList.remove('visible'));
+    document.querySelectorAll('.side-tab').forEach(t => t.classList.remove('active'));
+    const sec = document.getElementById('section-' + name);
+    if (sec) sec.classList.add('visible');
+    if (btn) btn.classList.add('active');
+  }
+
+  /* ── Password strength ── */
+  function updateStrength(val) {
+    const bar = document.getElementById('pwBar');
+    let score = 0;
+    if (val.length >= 8)          score++;
+    if (/[A-Z]/.test(val))        score++;
+    if (/[0-9]/.test(val))        score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const colors = ['#f87171', '#f5c542', '#4f8ef7', '#3de8c0'];
+    const widths  = ['25%', '50%', '75%', '100%'];
+    bar.style.width      = val.length ? (widths[score - 1] || '10%') : '0';
+    bar.style.background = val.length ? (colors[score - 1] || '#f87171') : 'transparent';
+  }
+
+  /* ── Auto-open correct section after save or OAuth redirect ── */
+  {% if success == 'doctor' %}
+    showSection('doctor', document.querySelector('[onclick*="doctor"]'));
+  {% elif success == 'patient' %}
+    showSection('patient', document.querySelector('[onclick*="patient"]'));
+  {% elif success == 'password' %}
+    showSection('password', document.querySelector('[onclick*="password"]'));
+  {% elif success == 'gcal_connected' or success == 'gcal_disconnected' %}
+    showSection('gcal', document.querySelector('[onclick*="gcal"]'));
+  {% endif %}
+
+  // Also handle query param redirect from OAuth
+  const _p = new URLSearchParams(window.location.search);
+  if (_p.get('gcal_success') || _p.get('gcal_error')) {
+    showSection('gcal', document.querySelector('[onclick*="gcal"]'));
+  }
+</script>
+
+{% endblock %}

@@ -1,0 +1,33 @@
+service: hms-email-service
+
+frameworkVersion: ">=3"
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: us-east-1
+  environment:
+    SMTP_HOST: ${env:SMTP_HOST, 'smtp.gmail.com'}
+    SMTP_PORT: ${env:SMTP_PORT, '587'}
+    SMTP_USER: ${env:SMTP_USER}
+    SMTP_PASSWORD: ${env:SMTP_PASSWORD}
+    FROM_EMAIL: ${env:FROM_EMAIL}
+    FROM_NAME: ${env:FROM_NAME, 'hms'}
+
+functions:
+  sendEmail:
+    handler: handler.send_email
+    timeout: 10
+    events:
+      - http:
+          path: /email/send
+          method: post
+          cors: true
+
+plugins:
+  - serverless-offline
+
+custom:
+  serverless-offline:
+    httpPort: 4000
+    host: 0.0.0.0
